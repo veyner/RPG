@@ -7,12 +7,12 @@ namespace Engine
     public class PlayerQuest
     {
         public Quest QuestDetails { get; set; }
-        public bool IsComplited { get; set; }
+        public bool IsCompleted { get; set; }
 
         public PlayerQuest(Quest questDetails, bool isComplited)
         {
             QuestDetails = questDetails;
-            IsComplited = isComplited;
+            IsCompleted = isComplited;
         }
     }
 }
