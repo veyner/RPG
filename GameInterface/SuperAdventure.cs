@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Engine;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -7,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Engine;
+using System.IO;
 
 namespace GameInterface
 {
@@ -15,41 +16,65 @@ namespace GameInterface
     {
         private Player _player;
         private Monster _monster;
+        private const string PLAYER_DATA_FILE_NAME = "PlayerData.xml";
 
         public SuperAdventure()
         {
             InitializeComponent();
+            if (File.Exists(PLAYER_DATA_FILE_NAME))
+            {
+                _player = Player.CreatePlayerFromXmlString(File.ReadAllText(PLAYER_DATA_FILE_NAME));
+            }
+            else
+            {
+                _player = Player.CreateDefaultPlayer();
+            }
 
-            _player = new Player(0, 0, 1, 10, 10);
+            lblHitPoints.DataBindings.Add("Text", _player, "CurrentHitPoints");
+            lblGold.DataBindings.Add("Text", _player, "Gold");
+            lblExperience.DataBindings.Add("Text", _player, "ExperiencePoints");
+            lblLevel.DataBindings.Add("Text", _player, "Level");
 
-            lblHitPoints.Text = _player.CurrentHitPoints.ToString();
-            lblGold.Text = _player.Gold.ToString();
-            lblExperience.Text = _player.ExperiencePoints.ToString();
-            lblLevel.Text = _player.Level.ToString();
+            dgvInventory.RowHeadersVisible = false;
+            dgvInventory.AutoGenerateColumns = false;
+
+            dgvInventory.DataSource = _player.Inventory;
+
+            dgvInventory.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Name",
+                Width = 197,
+                DataPropertyName = "Description"
+            });
+
+            dgvInventory.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Quantity",
+                DataPropertyName = "Quantity"
+            });
+
+            dgvQuests.RowHeadersVisible = false;
+            dgvQuests.AutoGenerateColumns = false;
+
+            dgvQuests.DataSource = _player.Quests;
+
+            dgvQuests.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Name",
+                Width = 197,
+                DataPropertyName = "Name"
+            });
+
+            dgvQuests.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Done?",
+                DataPropertyName = "IsCompleted"
+            });
+            MoveTo(_player.CurrentLocation);
         }
 
         private void SuperAdventure_Load(object sender, EventArgs e)
         {
-        }
-
-        private void btnNorth_Click(object sender, EventArgs e)
-        {
-            MoveTo(_player.CurrentLocation.LocationToNorth);
-        }
-
-        private void btnEast_Click(object sender, EventArgs e)
-        {
-            MoveTo(_player.CurrentLocation.LocationToEast);
-        }
-
-        private void btnSouth_Click(object sender, EventArgs e)
-        {
-            MoveTo(_player.CurrentLocation.LocationToSouth);
-        }
-
-        private void btnWest_Click(object sender, EventArgs e)
-        {
-            MoveTo(_player.CurrentLocation.LocationToWest);
         }
 
         private void MoveTo(Location newLocation)
@@ -71,8 +96,6 @@ namespace GameInterface
             rtbLocation.Text += newLocation.Description + Environment.NewLine;
 
             _player.CurrentHitPoints = _player.MaxHitPoints;
-
-            lblHitPoints.Text = _player.CurrentHitPoints.ToString();
 
             if (newLocation.QuestAvailableHere != null)
             {
@@ -98,7 +121,7 @@ namespace GameInterface
                             rtbMessages.Text += newLocation.QuestAvailableHere.RewardItem.Name + Environment.NewLine;
                             rtbMessages.Text += Environment.NewLine;
 
-                            _player.ExperiencePoints += newLocation.QuestAvailableHere.RewardExperiencePoints;
+                            _player.AddExperiencePoints(newLocation.QuestAvailableHere.RewardExperiencePoints);
                             _player.Gold += newLocation.QuestAvailableHere.RewardGold;
 
                             _player.AddItemToInventory(newLocation.QuestAvailableHere.RewardItem);
@@ -125,7 +148,7 @@ namespace GameInterface
                     }
                     rtbMessages.Text += Environment.NewLine;
 
-                    _player.Quests.Add(new PlayerQuest(newLocation.QuestAvailableHere, false));
+                    _player.Quests.Add(new PlayerQuest(newLocation.QuestAvailableHere));
                 }
             }
 
@@ -158,50 +181,9 @@ namespace GameInterface
                 btnUsePotion.Visible = false;
             }
 
-            UpdateInventoryListInUI();
-
-            UpdateQuestListInUI();
-
             UpdateWeaponListInUI();
 
             UpdatePotionListInUI();
-        }
-
-        private void UpdateInventoryListInUI()
-        {
-            dgvInventory.RowHeadersVisible = false;
-
-            dgvInventory.ColumnCount = 2;
-            dgvInventory.Columns[0].Name = "Name";
-            dgvInventory.Columns[0].Width = 197;
-            dgvInventory.Columns[1].Name = "Quantity";
-
-            dgvInventory.Rows.Clear();
-
-            foreach (InventoryItem inventoryItem in _player.Inventory)
-            {
-                if (inventoryItem.Quantity > 0)
-                {
-                    dgvInventory.Rows.Add(new[] { inventoryItem.Details.Name, inventoryItem.Quantity.ToString() });
-                }
-            }
-        }
-
-        private void UpdateQuestListInUI()
-        {
-            dgvQuests.RowHeadersVisible = false;
-
-            dgvQuests.ColumnCount = 2;
-            dgvQuests.Columns[0].Name = "Name";
-            dgvQuests.Columns[0].Width = 197;
-            dgvQuests.Columns[1].Name = "Done?";
-
-            dgvQuests.Rows.Clear();
-
-            foreach (PlayerQuest playerQuest in _player.Quests)
-            {
-                dgvQuests.Rows.Add(new[] { playerQuest.QuestDetails.Name, playerQuest.IsCompleted.ToString() });
-            }
         }
 
         private void UpdateWeaponListInUI()
@@ -226,11 +208,20 @@ namespace GameInterface
             }
             else
             {
+                cboWeapons.SelectedIndexChanged -= cboWeapons_SelectedIndexChanged;
                 cboWeapons.DataSource = weapons;
+                cboWeapons.SelectedIndexChanged += cboWeapons_SelectedIndexChanged;
                 cboWeapons.DisplayMember = "Name";
                 cboWeapons.ValueMember = "ID";
 
-                cboWeapons.SelectedIndex = 0;
+                if (_player.CurrentWeapon != null)
+                {
+                    cboWeapons.SelectedItem = _player.CurrentWeapon;
+                }
+                else
+                {
+                    cboWeapons.SelectedIndex = 0;
+                }
             }
         }
 
@@ -279,11 +270,12 @@ namespace GameInterface
                 rtbMessages.Text += Environment.NewLine;
                 rtbMessages.Text += "You defeated the " + _monster.Name + Environment.NewLine;
 
-                _player.ExperiencePoints += _monster.RewardExperiencePoints;
+                _player.AddExperiencePoints(_monster.RewardExperiencePoints);
                 rtbMessages.Text += "You receive " + _monster.RewardExperiencePoints.ToString() + " experience points" + Environment.NewLine;
 
                 _player.Gold += _monster.RewardGold;
                 rtbMessages.Text += "You receive " + _monster.RewardGold.ToString() + " gold" + Environment.NewLine;
+                ScrollToBottomOfMessages();
 
                 List<InventoryItem> lootedItems = new List<InventoryItem>();
 
@@ -313,19 +305,15 @@ namespace GameInterface
                     if (inventoryItem.Quantity == 1)
                     {
                         rtbMessages.Text += "You loot " + inventoryItem.Quantity.ToString() + " " + inventoryItem.Details.Name + Environment.NewLine;
+                        ScrollToBottomOfMessages();
                     }
                     else
                     {
                         rtbMessages.Text += "You loot " + inventoryItem.Quantity.ToString() + " " + inventoryItem.Details.NamePlural + Environment.NewLine;
+                        ScrollToBottomOfMessages();
                     }
                 }
 
-                lblHitPoints.Text = _player.CurrentHitPoints.ToString();
-                lblGold.Text = _player.Gold.ToString();
-                lblExperience.Text = _player.ExperiencePoints.ToString();
-                lblLevel.Text = _player.Level.ToString();
-
-                UpdateInventoryListInUI();
                 UpdateWeaponListInUI();
                 UpdatePotionListInUI();
 
@@ -338,15 +326,13 @@ namespace GameInterface
                 int damageToPlayer = RandomNumberGenerator.NumberBetween(0, _monster.MaxDamage);
 
                 rtbMessages.Text += "The " + _monster.Name + " did " + damageToPlayer.ToString() + " points of damage." + Environment.NewLine;
-
+                ScrollToBottomOfMessages();
                 _player.CurrentHitPoints -= damageToPlayer;
-
-                lblHitPoints.Text = _player.CurrentHitPoints.ToString();
 
                 if (_player.CurrentHitPoints <= 0)
                 {
                     rtbMessages.Text += "The " + _monster.Name + " killed you." + Environment.NewLine;
-
+                    ScrollToBottomOfMessages();
                     MoveTo(World.LocationByID(World.LOCATION_ID_HOME));
                 }
             }
@@ -377,19 +363,53 @@ namespace GameInterface
             int damageToPlayer = RandomNumberGenerator.NumberBetween(0, _monster.MaxDamage);
 
             rtbMessages.Text += "The " + _monster.Name + " did " + damageToPlayer.ToString() + " points of damage." + Environment.NewLine;
-
+            ScrollToBottomOfMessages();
             _player.CurrentHitPoints -= damageToPlayer;
 
             if (_player.CurrentHitPoints <= 0)
             {
                 rtbMessages.Text += "The " + _monster.Name + " killed you." + Environment.NewLine;
-
+                ScrollToBottomOfMessages();
                 MoveTo(World.LocationByID(World.LOCATION_ID_HOME));
             }
 
-            lblHitPoints.Text = _player.CurrentHitPoints.ToString();
-            UpdateInventoryListInUI();
             UpdatePotionListInUI();
+        }
+
+        private void btnNorth_Click_1(object sender, EventArgs e)
+        {
+            MoveTo(_player.CurrentLocation.LocationToNorth);
+        }
+
+        private void btnEast_Click_1(object sender, EventArgs e)
+        {
+            MoveTo(_player.CurrentLocation.LocationToEast);
+        }
+
+        private void btnSouth_Click_1(object sender, EventArgs e)
+        {
+            MoveTo(_player.CurrentLocation.LocationToSouth);
+        }
+
+        private void btnWest_Click_1(object sender, EventArgs e)
+        {
+            MoveTo(_player.CurrentLocation.LocationToWest);
+        }
+
+        private void ScrollToBottomOfMessages()
+        {
+            rtbMessages.SelectionStart = rtbMessages.Text.Length;
+            rtbMessages.ScrollToCaret();
+        }
+
+        private void SuperAdventure_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            File.WriteAllText(PLAYER_DATA_FILE_NAME, _player.ToXmlString());
+        }
+
+        private void cboWeapons_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            _player.CurrentWeapon = (Weapon)cboWeapons.SelectedItem;
         }
     }
 }
