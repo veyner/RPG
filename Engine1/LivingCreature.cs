@@ -7,7 +7,7 @@ namespace Engine
 {
     public class LivingCreature : INotifyPropertyChanged
     {
-        public int MaxHitPoints { get; set; }
+        public int MaximumHitPoints { get; set; }
 
         private int _currentHitPoints;
 
@@ -21,10 +21,10 @@ namespace Engine
             }
         }
 
-        public LivingCreature(int currentHitPoints, int maxHitPoints)
+        public LivingCreature(int currentHitPoints, int maximumHitPoints)
         {
             CurrentHitPoints = currentHitPoints;
-            MaxHitPoints = maxHitPoints;
+            MaximumHitPoints = maximumHitPoints;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
